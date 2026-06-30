@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useLayoutEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 
 const COLORS = ['#e94560','#f5a623','#06d6a0','#00b4d8','#7209b7','#1b6ca8','#ff6b6b','#0096c7'];
 
@@ -41,12 +41,20 @@ export default function MindMapOutput({ data }) {
   const containerRef = useRef(null);
   const centerRef = useRef(null);
   const branchRefs = useRef({});
+  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
   const [paths, setPaths] = useState([]);
 
   const computePaths = useCallback(() => {
-    if (!containerRef.current || !centerRef.current) return;
-    const cr = containerRef.current.getBoundingClientRect();
-    const centR = centerRef.current.getBoundingClientRect();
+    const container = containerRef.current;
+    const centerEl = centerRef.current;
+    if (!container || !centerEl) return;
+
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+    setSvgSize({ w, h });
+
+    const cr = container.getBoundingClientRect();
+    const centR = centerEl.getBoundingClientRect();
     const cy = centR.top + centR.height / 2 - cr.top;
     const centLeft = centR.left - cr.left;
     const centRight = centR.right - cr.left;
@@ -69,10 +77,10 @@ export default function MindMapOutput({ data }) {
     setPaths(newPaths);
   }, [branches]);
 
-  useLayoutEffect(() => {
-    computePaths();
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => computePaths());
     window.addEventListener('resize', computePaths);
-    return () => window.removeEventListener('resize', computePaths);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', computePaths); };
   }, [computePaths]);
 
   if (!branches.length) return <p style={{ color: 'var(--text2)' }}>No mind map generated.</p>;
@@ -82,25 +90,29 @@ export default function MindMapOutput({ data }) {
 
   return (
     <div ref={containerRef} style={{ position: 'relative', padding: '8px 0' }}>
-      {/* connector lines */}
-      <svg style={{
-        position: 'absolute', inset: 0, width: '100%', height: '100%',
-        pointerEvents: 'none', overflow: 'visible', zIndex: 0,
-      }}>
-        {paths.map((p, i) => (
-          <path key={i} d={p.d} stroke={p.color} strokeWidth={2}
-            fill="none" opacity={0.65} strokeLinecap="round" />
-        ))}
-      </svg>
+      {svgSize.w > 0 && (
+        <svg
+          width={svgSize.w}
+          height={svgSize.h}
+          style={{
+            position: 'absolute', top: 0, left: 0,
+            pointerEvents: 'none', overflow: 'visible', zIndex: 0,
+          }}
+        >
+          {paths.map((p, i) => (
+            <path key={i} d={p.d} stroke={p.color} strokeWidth={2}
+              fill="none" opacity={0.7} strokeLinecap="round" />
+          ))}
+        </svg>
+      )}
 
       <div style={{
         display: 'flex', alignItems: 'center',
-        gap: 12, position: 'relative', zIndex: 1,
+        gap: 16, position: 'relative', zIndex: 1,
       }}>
-        {/* LEFT branches */}
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          gap: 12, alignItems: 'flex-end',
+          gap: 14, alignItems: 'flex-end',
         }}>
           {left.map(b => (
             <BranchNode key={b.i} branch={b} color={COLORS[b.i % COLORS.length]}
@@ -108,22 +120,26 @@ export default function MindMapOutput({ data }) {
           ))}
         </div>
 
-        {/* CENTER node */}
         <div ref={centerRef} style={{
-          flexShrink: 0, width: 110, minHeight: 110,
-          background: 'var(--accent, #7c3aed)', color: '#fff',
-          borderRadius: '50%', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', textAlign: 'center',
-          fontWeight: 800, fontSize: 13, lineHeight: 1.3,
-          padding: 12, boxShadow: '0 4px 24px var(--accent, #7c3aed)55',
+          flexShrink: 0,
+          width: 120, minHeight: 120,
+          background: 'var(--accent, #7c3aed)',
+          color: '#fff',
+          borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center',
+          fontWeight: 800, fontSize: 12, lineHeight: 1.35,
+          padding: 14,
+          boxSizing: 'border-box',
+          wordBreak: 'break-word',
+          boxShadow: '0 4px 24px rgba(124,58,237,0.45)',
         }}>
-          {center}
+          {center || 'Topic'}
         </div>
 
-        {/* RIGHT branches */}
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          gap: 12, alignItems: 'flex-start',
+          gap: 14, alignItems: 'flex-start',
         }}>
           {right.map(b => (
             <BranchNode key={b.i} branch={b} color={COLORS[b.i % COLORS.length]}
