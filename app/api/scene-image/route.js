@@ -6,18 +6,37 @@ export async function POST(req) {
   const { prompt } = await req.json();
   if (!prompt) return NextResponse.json({ error: 'prompt required' }, { status: 400 });
 
-  const enriched = 'Cinematic documentary still image. High detail, dramatic lighting, historically accurate. ' + prompt + ' Style: epic historical painting, National Geographic photography aesthetic. No text or watermarks.';
+  const enriched = 'Cinematic documentary still. Dramatic lighting, historically accurate, epic. ' + prompt + ' National Geographic style. No text.';
 
-  try {
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'dall-e-3', prompt: enriched, n: 1, size: '1792x1024', quality: 'standard' }),
-    });
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.error?.message || 'OpenAI error' }, { status: res.status });
-    return NextResponse.json({ url: data.data[0].url });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  // Try gpt-image-1 first, fall back to dall-e-2
+  const models = [
+    { model: 'gpt-image-1', size: '1536x1024', response_format: 'b64_json' },
+    { model: 'dall-e-2', size: '1024x1024', response_format: 'url' },
+  ];
+
+  for (const cfg of models) {
+    try {
+      const body = { model: cfg.model, prompt: enriched, n: 1, size: cfg.size };
+      if (cfg.response_format) body.response_format = cfg.response_format;
+      const res = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error?.message || '';
+        if (msg.includes('does not exist') || msg.includes('not found') || res.status === 404) continue;
+        return NextResponse.json({ error: msg }, { status: res.status });
+      }
+      const item = data.data[0];
+      if (item.url) return NextResponse.json({ url: item.url });
+      if (item.b64_json) {
+        const url = 'data:image/png;base64,' + item.b64_json;
+        return NextResponse.json({ url });
+      }
+    } catch (e) { continue; }
   }
+
+  return NextResponse.json({ error: 'No available image model' }, { status: 500 });
 }
