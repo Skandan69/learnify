@@ -22,6 +22,39 @@ export async function POST(request) {
   }
 
   try {
+    // Use SD3 via the v2beta stable-image endpoint for much better quality
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('negative_prompt', 'blurry, low quality, watermark, signature, text overlay, distorted faces, bad anatomy');
+    formData.append('aspect_ratio', '16:9');
+    formData.append('output_format', 'png');
+    formData.append('model', 'sd3-large');
+
+    const res = await fetch('https://api.stability.ai/v2beta/stable-image/generate/sd3', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'image/*',
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      // Fall back to SDXL if SD3 fails (e.g. insufficient credits)
+      return await fallbackToSDXL(apiKey, prompt);
+    }
+
+    const imageBuffer = await res.arrayBuffer();
+    const b64 = Buffer.from(imageBuffer).toString('base64');
+    return NextResponse.json({ image: `data:image/png;base64,${b64}` });
+  } catch (e) {
+    return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 });
+  }
+}
+
+async function fallbackToSDXL(apiKey, prompt) {
+  try {
     const res = await fetch(
       'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image',
       {
@@ -39,7 +72,7 @@ export async function POST(request) {
           cfg_scale: 7,
           height: 768,
           width: 1344,
-          steps: 30,
+          steps: 40,
           samples: 1,
         }),
       }
@@ -58,7 +91,6 @@ export async function POST(request) {
     if (!b64) {
       return NextResponse.json({ error: 'No image returned from Stability AI.' }, { status: 500 });
     }
-
     return NextResponse.json({ image: `data:image/png;base64,${b64}` });
   } catch (e) {
     return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 });
