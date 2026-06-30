@@ -68,7 +68,7 @@ function HeyGenPanel({ scenes, title }) {
         <span style={{ fontSize: 10, background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>PREMIUM</span>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text2, #aaa)', marginBottom: 14, lineHeight: 1.5 }}>
-        Turn this script into a professional video with a consistent AI presenter — same character across all scenes.
+        Turn this script into a professional video with a consistent AI presenter â same character across all scenes.
       </p>
 
       {status === 'idle' && (
@@ -88,7 +88,7 @@ function HeyGenPanel({ scenes, title }) {
             ))}
           </div>
           <p style={{ fontSize: 11, color: 'var(--text2, #888)', marginBottom: 12 }}>
-            {Math.min(scenes.length, 10)} scenes · renders in 2-5 min
+            {Math.min(scenes.length, 10)} scenes Â· renders in 2-5 min
           </p>
           <button onClick={startGeneration} style={{
             background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: '#fff', border: 'none',
@@ -111,7 +111,7 @@ function HeyGenPanel({ scenes, title }) {
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}></div>
           <p style={{ fontSize: 13, color: 'var(--text2, #aaa)', lineHeight: 1.5 }}>{pollMsg}</p>
-          <p style={{ fontSize: 11, color: 'var(--text2, #666)', marginTop: 8 }}>You can leave this tab open — we check every 10 seconds.</p>
+          <p style={{ fontSize: 11, color: 'var(--text2, #666)', marginTop: 8 }}>You can leave this tab open â we check every 10 seconds.</p>
         </div>
       )}
 
@@ -119,7 +119,7 @@ function HeyGenPanel({ scenes, title }) {
         <div style={{ padding: 14, background: 'rgba(233,69,96,0.1)', border: '1px solid #e94560', borderRadius: 8 }}>
           <p style={{ color: '#e94560', fontWeight: 600, marginBottom: 6 }}>Generation failed</p>
           <p style={{ color: 'var(--text2, #aaa)', fontSize: 12 }}>{errorMsg}</p>
-          <button onClick={() => setStatus('idle')} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', background: 'none', border: '1px solid #e94560', color: '#e94560', fontSize: 12 }}>↩ Try again</button>
+          <button onClick={() => setStatus('idle')} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', background: 'none', border: '1px solid #e94560', color: '#e94560', fontSize: 12 }}>â© Try again</button>
         </div>
       )}
 
@@ -130,7 +130,7 @@ function HeyGenPanel({ scenes, title }) {
              Download MP4
           </a>
           <button onClick={() => { setStatus('idle'); setVideoUrl(null); }} style={{ marginTop: 8, width: '100%', padding: '8px', borderRadius: 8, background: 'none', border: '1px solid var(--border, #333)', color: 'var(--text2, #aaa)', cursor: 'pointer', fontSize: 12 }}>
-            ↩ Generate with a different avatar
+            â© Generate with a different avatar
           </button>
         </div>
       )}
@@ -216,11 +216,11 @@ export default function VideoStoryOutput({ data }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
-        <button onClick={() => goTo(Math.max(0, current - 1))} disabled={current === 0} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1, fontSize: 16 }}><</button>
+        <button onClick={() => goTo(Math.max(0, current - 1))} disabled={current === 0} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1, fontSize: 16 }}>{'<'}</button>
         <button onClick={handlePlayPause} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'var(--accent, #7c3aed)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: loadingAudio ? 'wait' : 'pointer' }}>
           {loadingAudio ? ' Loading...' : playing ? '|| Pause' : '> Play Documentary'}
         </button>
-        <button onClick={() => goTo(Math.min(scenes.length - 1, current + 1))} disabled={current === scenes.length - 1} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === scenes.length - 1 ? 'not-allowed' : 'pointer', opacity: current === scenes.length - 1 ? 0.4 : 1, fontSize: 16 }}>></button>
+        <button onClick={() => goTo(Math.min(scenes.length - 1, current + 1))} disabled={current === scenes.length - 1} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === scenes.length - 1 ? 'not-allowed' : 'pointer', opacity: current === scenes.length - 1 ? 0.4 : 1, fontSize: 16 }}>{'>'}</button>
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto', paddingBottom: 4 }}>
