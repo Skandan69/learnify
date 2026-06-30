@@ -50,8 +50,12 @@ export default function VideoStoryOutput({ data }) {
     if (current + 1 < scenes.length) fetchImage(current + 1);
   }, [current, scenes.length]);
 
+  // FIX: null out handlers BEFORE pausing/clearing src to prevent onerror firing
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.ontimeupdate = null;
       audioRef.current.pause();
       audioRef.current.src = '';
       audioRef.current = null;
@@ -105,7 +109,6 @@ export default function VideoStoryOutput({ data }) {
       await audio.play();
     } catch (e) {
       setLoadingAudio(false);
-      // fallback timer
       const dur = 6000;
       const start = Date.now();
       progRef.current = setInterval(() => {
@@ -144,175 +147,90 @@ export default function VideoStoryOutput({ data }) {
           {title}
         </p>
       )}
-
-      <div
-        key={animKey}
-        style={{
-          position: 'relative', borderRadius: 12, overflow: 'hidden',
-          minHeight: 340, display: 'flex', flexDirection: 'column',
-          background: `linear-gradient(135deg, ${bg1} 0%, ${bg2} 100%)`,
-          boxShadow: `0 0 0 1px ${accent}22, 0 8px 32px #0008`,
-          animation: 'fadeInScene 0.5s ease',
-        }}
-      >
-        {/* AI background image with Ken Burns */}
+      <div key={animKey} style={{
+        position: 'relative', borderRadius: 12, overflow: 'hidden',
+        minHeight: 340, display: 'flex', flexDirection: 'column',
+        background: `linear-gradient(135deg, ${bg1} 0%, ${bg2} 100%)`,
+        boxShadow: `0 0 0 1px ${accent}22, 0 8px 32px #0008`,
+        animation: 'fadeInScene 0.5s ease',
+      }}>
         {imgSrc && (
           <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-            <img
-              src={imgSrc}
-              alt=""
-              style={{
-                width: '100%', height: '100%', objectFit: 'cover',
-                animation: 'kenBurns 14s ease-in-out forwards',
-                opacity: 0.5,
-              }}
-            />
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: `linear-gradient(135deg, ${bg1}bb 0%, ${bg2}88 100%)`,
+            <img src={imgSrc} alt="" style={{
+              width: '100%', height: '100%', objectFit: 'cover',
+              animation: 'kenBurns 14s ease-in-out forwards', opacity: 0.5,
             }} />
+            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${bg1}bb 0%, ${bg2}88 100%)` }} />
           </div>
         )}
-
-        {/* Image loading indicator */}
         {imgLoading[current] && !imgSrc && (
-          <div style={{
-            position: 'absolute', top: 12, right: 12, zIndex: 2,
-            background: '#00000077', borderRadius: 6, padding: '4px 10px',
-          }}>
+          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#00000077', borderRadius: 6, padding: '4px 10px' }}>
             <span style={{ fontSize: 11, color: '#fff8' }}>✨ Generating scene...</span>
           </div>
         )}
-
-        {/* Audio loading indicator */}
         {loadingAudio && (
-          <div style={{
-            position: 'absolute', top: 12, left: 12, zIndex: 2,
-            background: accent + '33', border: `1px solid ${accent}66`,
-            borderRadius: 6, padding: '4px 10px',
-          }}>
+          <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, background: accent + '33', border: `1px solid ${accent}66`, borderRadius: 6, padding: '4px 10px' }}>
             <span style={{ fontSize: 11, color: accent }}>🎙 Loading voice...</span>
           </div>
         )}
-
-        {/* Content */}
-        <div style={{
-          position: 'relative', zIndex: 1, padding: '32px 28px 28px',
-          display: 'flex', flexDirection: 'column', flex: 1,
-        }}>
+        <div style={{ position: 'relative', zIndex: 1, padding: '32px 28px 28px', display: 'flex', flexDirection: 'column', flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-            <span style={{
-              fontSize: 11, color: accent, fontWeight: 700,
-              letterSpacing: 3, textTransform: 'uppercase', opacity: 0.9,
-            }}>
+            <span style={{ fontSize: 11, color: accent, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', opacity: 0.9 }}>
               Scene {current + 1} / {scenes.length}
             </span>
             <span style={{ fontSize: 28 }}>{scene.emoji || '🎬'}</span>
           </div>
-
-          <h3 style={{
-            color: '#fff', fontSize: 22, fontWeight: 700, lineHeight: 1.3,
-            marginBottom: 16, textShadow: '0 2px 12px #000a',
-            animation: 'slideUp 0.5s ease 0.1s both',
-          }}>
+          <h3 style={{ color: '#fff', fontSize: 22, fontWeight: 700, lineHeight: 1.3, marginBottom: 16, textShadow: '0 2px 12px #000a', animation: 'slideUp 0.5s ease 0.1s both' }}>
             {scene.title}
           </h3>
-
           {scene.keyfact && (
-            <div style={{
-              background: accent + '22', border: `1px solid ${accent}66`,
-              borderRadius: 8, padding: '10px 14px', marginBottom: 16,
-              animation: 'slideUp 0.5s ease 0.25s both',
-            }}>
-              <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: 0 }}>
-                {scene.keyfact}
-              </p>
+            <div style={{ background: accent + '22', border: `1px solid ${accent}66`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, animation: 'slideUp 0.5s ease 0.25s both' }}>
+              <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: 0 }}>{scene.keyfact}</p>
             </div>
           )}
-
-          <div style={{
-            background: '#00000066', borderRadius: 8, padding: '12px 16px',
-            animation: 'slideUp 0.5s ease 0.35s both', flex: 1,
-          }}>
-            <p style={{ color: '#ffffffcc', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-              {scene.narration}
-            </p>
+          <div style={{ background: '#00000066', borderRadius: 8, padding: '12px 16px', animation: 'slideUp 0.5s ease 0.35s both', flex: 1 }}>
+            <p style={{ color: '#ffffffcc', fontSize: 13, lineHeight: 1.7, margin: 0 }}>{scene.narration}</p>
           </div>
         </div>
-
-        {/* Progress bar */}
         {playing && (
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: '#ffffff22' }}>
             <div style={{ height: '100%', background: accent, width: progress + '%', transition: 'width 0.15s linear' }} />
           </div>
         )}
       </div>
-
-      {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-        <button
-          onClick={() => { if (current > 0) goToScene(current - 1, playing); }}
-          disabled={current === 0}
-          style={ctrlBtn(current === 0)}
-        >◀</button>
+        <button onClick={() => { if (current > 0) goToScene(current - 1, playing); }} disabled={current === 0} style={ctrlBtn(current === 0)}>◀</button>
         <button
           onClick={() => setPlaying(p => !p)}
           disabled={loadingAudio}
-          style={{
-            flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none',
-            background: 'var(--accent)', color: '#fff', fontWeight: 700,
-            fontSize: 14, cursor: loadingAudio ? 'wait' : 'pointer',
-            opacity: loadingAudio ? 0.7 : 1,
-          }}
+          style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: loadingAudio ? 'wait' : 'pointer', opacity: loadingAudio ? 0.7 : 1 }}
         >
           {loadingAudio ? '🎙 Loading...' : playing ? '⏸ Pause' : current === 0 ? '▶ Play Documentary' : '▶ Resume'}
         </button>
-        <button
-          onClick={() => { if (current + 1 < scenes.length) goToScene(current + 1, playing); }}
-          disabled={current === scenes.length - 1}
-          style={ctrlBtn(current === scenes.length - 1)}
-        >▶</button>
+        <button onClick={() => { if (current + 1 < scenes.length) goToScene(current + 1, playing); }} disabled={current === scenes.length - 1} style={ctrlBtn(current === scenes.length - 1)}>▶</button>
       </div>
-
-      {/* Scene thumbnail strip */}
       <div style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto', paddingBottom: 4 }}>
         {scenes.map((s, i) => {
           const [c1, c2, ac] = COLORS[i % COLORS.length];
           return (
-            <button
-              key={i}
-              onClick={() => goToScene(i, playing)}
-              style={{
-                flex: '0 0 auto', width: 72, height: 48, borderRadius: 6,
-                background: images[i]
-                  ? `url(data:image/jpeg;base64,${images[i]}) center/cover`
-                  : `linear-gradient(135deg, ${c1}, ${c2})`,
-                border: i === current ? `2px solid ${ac}` : '2px solid transparent',
-                cursor: 'pointer', fontSize: 16, transition: 'all 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                position: 'relative', overflow: 'hidden',
-              }}
-            >
+            <button key={i} onClick={() => goToScene(i, playing)} style={{
+              flex: '0 0 auto', width: 72, height: 48, borderRadius: 6,
+              background: images[i] ? `url(data:image/jpeg;base64,${images[i]}) center/cover` : `linear-gradient(135deg, ${c1}, ${c2})`,
+              border: i === current ? `2px solid ${ac}` : '2px solid transparent',
+              cursor: 'pointer', fontSize: 16, transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'relative', overflow: 'hidden',
+            }}>
               {images[i] && <div style={{ position: 'absolute', inset: 0, background: '#0005' }} />}
               <span style={{ position: 'relative', zIndex: 1 }}>{s.emoji || '🎬'}</span>
             </button>
           );
         })}
       </div>
-
       <style>{`
-        @keyframes fadeInScene {
-          from { opacity: 0; transform: scale(0.98); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes kenBurns {
-          from { transform: scale(1) translate(0, 0); }
-          to { transform: scale(1.08) translate(-2%, -1%); }
-        }
+        @keyframes fadeInScene { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes kenBurns { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.08) translate(-2%, -1%); } }
       `}</style>
     </div>
   );
