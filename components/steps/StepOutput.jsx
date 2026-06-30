@@ -12,25 +12,58 @@ import AnalogyOutput from '../outputs/AnalogyOutput';
 import WriteCheckOutput from '../outputs/WriteCheckOutput';
 import ImageStoryOutput from '../outputs/ImageStoryOutput';
 import VideoStoryOutput from '../outputs/VideoStoryOutput';
+import FlowchartOutput from '../outputs/FlowchartOutput';
 
 const OUTPUT_MAP = {
-  story:     StoryOutput,
-  visual:    VisualOutput,
+  story: StoryOutput,
+  visual: VisualOutput,
   flashcard: FlashcardOutput,
-  audio:     AudioOutput,
-  mindmap:   MindMapOutput,
-  quiz:      QuizOutput,
-  summary:   SummaryOutput,
-  ppt:       SlideOutput,
-  analogy:   AnalogyOutput,
+  audio: AudioOutput,
+  mindmap: MindMapOutput,
+  quiz: QuizOutput,
+  summary: SummaryOutput,
+  ppt: SlideOutput,
+  analogy: AnalogyOutput,
   freewrite: WriteCheckOutput,
-  imgstory:  ImageStoryOutput,
-  video:     VideoStoryOutput,
+  imgstory: ImageStoryOutput,
+  video: VideoStoryOutput,
+  flowchart: FlowchartOutput,
 };
+
+function buildDownloadText(fmt, parsed) {
+  if (!parsed) return '';
+  try {
+    if (fmt === 'story') return [parsed.scenes?.map(s => `${s.label}\n\n${s.text}`).join('\n\n---\n\n'), parsed.takeaway ? `\nTakeaway: ${parsed.takeaway}` : ''].join('');
+    if (fmt === 'visual') return parsed.panels?.map(p => `${p.emoji} ${p.title}\n${p.description}`).join('\n\n') || '';
+    if (fmt === 'flashcard') return parsed.cards?.map((c, i) => `Q${i+1}: ${c.question}\nA: ${c.answer}`).join('\n\n') || '';
+    if (fmt === 'audio') return `${parsed.title}\n\n${parsed.script}`;
+    if (fmt === 'mindmap') return [parsed.center, ...(parsed.branches || []).map(b => `\n${b.title}\n${b.points?.map(p => `  • ${p}`).join('\n')}`)].join('\n');
+    if (fmt === 'quiz') return parsed.questions?.map((q, i) => `Q${i+1}: ${q.q}\nA) ${q.options[0]}\nB) ${q.options[1]}\nC) ${q.options[2]}\nD) ${q.options[3]}\nAnswer: ${['A','B','C','D'][q.correct]}`).join('\n\n') || '';
+    if (fmt === 'summary') return [`Overview:\n${parsed.overview}`, `\nKey Points:\n${parsed.keypoints?.map(k => `• ${k}`).join('\n')}`, `\nTerms:\n${parsed.terms?.map(t => `• ${t}`).join('\n')}`].join('\n');
+    if (fmt === 'ppt') return parsed.slides?.map(s => `${s.title}\n${s.bullets?.map(b => `  • ${b}`).join('\n')}`).join('\n\n') || '';
+    if (fmt === 'analogy') return parsed.analogies?.map(a => `${a.concept}\nAnalogy: ${a.analogy}\n${a.explanation}`).join('\n\n') || '';
+    if (fmt === 'freewrite') return `Topic: ${parsed.topic}\n\nHints:\n${parsed.hints?.map(h => `• ${h}`).join('\n')}`;
+    if (fmt === 'imgstory') return parsed.scenes?.map(s => `${s.label}\n${s.text}`).join('\n\n') || '';
+    if (fmt === 'video') return [`${parsed.title}`, ...(parsed.scenes || []).map(s => `\n${s.title}\n${s.narration}\n📌 ${s.keyfact}`)].join('\n');
+    if (fmt === 'flowchart') return [`${parsed.title}`, ...(parsed.nodes || []).map((n, i) => `${i+1}. [${n.type.toUpperCase()}] ${n.label}${n.yesLabel ? ` → Yes: ${n.yesLabel}` : ''}${n.noLabel ? ` / No: ${n.noLabel}` : ''}`)].join('\n');
+  } catch(e) {}
+  return JSON.stringify(parsed, null, 2);
+}
 
 export default function StepOutput({ fmt, loading, error, parsed, content, onBack, onRetry }) {
   const meta = FORMAT_META[fmt] || {};
   const OutputComponent = OUTPUT_MAP[fmt];
+
+  function handleDownload() {
+    const text = buildDownloadText(fmt, parsed);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `learnify-${fmt}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div>
@@ -66,6 +99,11 @@ export default function StepOutput({ fmt, loading, error, parsed, content, onBac
         <button className="btn-ghost" style={{ flex: 1 }} onClick={onRetry}>
           ↻ Regenerate
         </button>
+        {!loading && !error && parsed && (
+          <button className="btn-ghost" style={{ flex: 1 }} onClick={handleDownload}>
+            ⬇ Download
+          </button>
+        )}
       </div>
     </div>
   );
