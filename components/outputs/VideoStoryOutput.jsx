@@ -29,7 +29,7 @@ function HeyGenPanel({ scenes, title }) {
       const data = await res.json();
       if (!res.ok || !data.video_id) throw new Error(data.error || 'Failed to start generation');
       setStatus('polling');
-      setPollMsg('HeyGen is rendering your video\u2026 this usually takes 2\u20135 minutes.');
+      setPollMsg('HeyGen is rendering your video... this usually takes 2-5 minutes.');
       pollStatus(data.video_id);
     } catch (e) {
       setStatus('error');
@@ -52,7 +52,7 @@ function HeyGenPanel({ scenes, title }) {
           setErrorMsg('HeyGen rendering failed. Please try again.');
         } else {
           const pct = data.progress ? ' (' + Math.round(data.progress * 100) + '%)' : '';
-          setPollMsg('Rendering in progress' + pct + '\u2026 checking again in 10 seconds.');
+          setPollMsg('Rendering in progress' + pct + '... checking again in 10 seconds.');
         }
       } catch (e) {}
     }, 10000);
@@ -63,12 +63,12 @@ function HeyGenPanel({ scenes, title }) {
   return (
     <div style={{ marginTop: 28, borderTop: '1px solid var(--border, #2a2a3e)', paddingTop: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 18 }}>\uD83C\uDFA6</span>
+        <span style={{ fontSize: 18 }}></span>
         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text1, #eee)' }}>Generate Real AI Video</span>
         <span style={{ fontSize: 10, background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>PREMIUM</span>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text2, #aaa)', marginBottom: 14, lineHeight: 1.5 }}>
-        Turn this script into a professional video with a consistent AI presenter \u2014 same character across all scenes.
+        Turn this script into a professional video with a consistent AI presenter — same character across all scenes.
       </p>
 
       {status === 'idle' && (
@@ -88,7 +88,7 @@ function HeyGenPanel({ scenes, title }) {
             ))}
           </div>
           <p style={{ fontSize: 11, color: 'var(--text2, #888)', marginBottom: 12 }}>
-            {Math.min(scenes.length, 10)} scenes \u00b7 renders in 2\u20135 min
+            {Math.min(scenes.length, 10)} scenes · renders in 2-5 min
           </p>
           <button onClick={startGeneration} style={{
             background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: '#fff', border: 'none',
@@ -102,16 +102,16 @@ function HeyGenPanel({ scenes, title }) {
 
       {status === 'generating' && (
         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text2, #aaa)' }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>\u23F3</div>
-          <p style={{ fontSize: 13 }}>Submitting to HeyGen\u2026</p>
+          <div style={{ fontSize: 28, marginBottom: 8 }}></div>
+          <p style={{ fontSize: 13 }}>Submitting to HeyGen...</p>
         </div>
       )}
 
       {status === 'polling' && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>\uD83C\uDF9E\uFE0F</div>
+          <div style={{ fontSize: 28, marginBottom: 8 }}></div>
           <p style={{ fontSize: 13, color: 'var(--text2, #aaa)', lineHeight: 1.5 }}>{pollMsg}</p>
-          <p style={{ fontSize: 11, color: 'var(--text2, #666)', marginTop: 8 }}>You can leave this tab open \u2014 we check every 10 seconds.</p>
+          <p style={{ fontSize: 11, color: 'var(--text2, #666)', marginTop: 8 }}>You can leave this tab open — we check every 10 seconds.</p>
         </div>
       )}
 
@@ -119,7 +119,7 @@ function HeyGenPanel({ scenes, title }) {
         <div style={{ padding: 14, background: 'rgba(233,69,96,0.1)', border: '1px solid #e94560', borderRadius: 8 }}>
           <p style={{ color: '#e94560', fontWeight: 600, marginBottom: 6 }}>Generation failed</p>
           <p style={{ color: 'var(--text2, #aaa)', fontSize: 12 }}>{errorMsg}</p>
-          <button onClick={() => setStatus('idle')} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', background: 'none', border: '1px solid #e94560', color: '#e94560', fontSize: 12 }}>\u21A9 Try again</button>
+          <button onClick={() => setStatus('idle')} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', background: 'none', border: '1px solid #e94560', color: '#e94560', fontSize: 12 }}>↩ Try again</button>
         </div>
       )}
 
@@ -127,10 +127,10 @@ function HeyGenPanel({ scenes, title }) {
         <div>
           <video src={videoUrl} controls style={{ width: '100%', borderRadius: 10, marginBottom: 12 }} />
           <a href={videoUrl} download="learnify-video.mp4" style={{ display: 'block', textAlign: 'center', padding: '10px', background: 'var(--accent, #7c3aed)', color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
-            \u2B07 Download MP4
+             Download MP4
           </a>
           <button onClick={() => { setStatus('idle'); setVideoUrl(null); }} style={{ marginTop: 8, width: '100%', padding: '8px', borderRadius: 8, background: 'none', border: '1px solid var(--border, #333)', color: 'var(--text2, #aaa)', cursor: 'pointer', fontSize: 12 }}>
-            \u21A9 Generate with a different avatar
+            ↩ Generate with a different avatar
           </button>
         </div>
       )}
@@ -202,7 +202,7 @@ export default function VideoStoryOutput({ data }) {
         <div style={{ position: 'absolute', top: 16, left: 20, fontSize: 10, letterSpacing: 2, color: 'var(--accent, #7c3aed)', fontWeight: 700, textTransform: 'uppercase' }}>
           Scene {current + 1} / {scenes.length}
         </div>
-        <div style={{ position: 'absolute', top: 12, right: 16, fontSize: 28, opacity: 0.8 }}>{scene.emoji || '\uD83C\uDFA6'}</div>
+        <div style={{ position: 'absolute', top: 12, right: 16, fontSize: 28, opacity: 0.8 }}>{scene.emoji || ''}</div>
         <h3 style={{ color: '#fff', fontSize: 20, fontWeight: 800, marginTop: 32, marginBottom: 12, lineHeight: 1.3 }}>{scene.title}</h3>
         {scene.keyfact && (
           <div style={{ background: 'rgba(124,58,237,0.25)', border: '1px solid rgba(124,58,237,0.5)', borderRadius: 6, padding: '6px 12px', marginBottom: 14, fontSize: 12, color: '#c4b5fd', fontWeight: 600 }}>{scene.keyfact}</div>
@@ -216,17 +216,17 @@ export default function VideoStoryOutput({ data }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
-        <button onClick={() => goTo(Math.max(0, current - 1))} disabled={current === 0} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1, fontSize: 16 }}>\u25C0</button>
+        <button onClick={() => goTo(Math.max(0, current - 1))} disabled={current === 0} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1, fontSize: 16 }}><</button>
         <button onClick={handlePlayPause} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'var(--accent, #7c3aed)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: loadingAudio ? 'wait' : 'pointer' }}>
-          {loadingAudio ? '\u23F3 Loading\u2026' : playing ? '\u23F8 Pause' : '\u25B6 Play Documentary'}
+          {loadingAudio ? ' Loading...' : playing ? '|| Pause' : '> Play Documentary'}
         </button>
-        <button onClick={() => goTo(Math.min(scenes.length - 1, current + 1))} disabled={current === scenes.length - 1} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === scenes.length - 1 ? 'not-allowed' : 'pointer', opacity: current === scenes.length - 1 ? 0.4 : 1, fontSize: 16 }}>\u25B6</button>
+        <button onClick={() => goTo(Math.min(scenes.length - 1, current + 1))} disabled={current === scenes.length - 1} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === scenes.length - 1 ? 'not-allowed' : 'pointer', opacity: current === scenes.length - 1 ? 0.4 : 1, fontSize: 16 }}>></button>
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto', paddingBottom: 4 }}>
         {scenes.map((s, i) => (
           <button key={i} onClick={() => goTo(i)} style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 8, border: '2px solid ' + (i === current ? 'var(--accent, #7c3aed)' : 'transparent'), background: i === current ? 'rgba(124,58,237,0.2)' : 'var(--surface1, #1e1e2e)', cursor: 'pointer', fontSize: 18 }}>
-            {s.emoji || '\uD83C\uDFA6'}
+            {s.emoji || ''}
           </button>
         ))}
       </div>
