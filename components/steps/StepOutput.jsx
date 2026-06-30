@@ -11,6 +11,7 @@ import SlideOutput from '../outputs/SlideOutput';
 import AnalogyOutput from '../outputs/AnalogyOutput';
 import WriteCheckOutput from '../outputs/WriteCheckOutput';
 import ImageStoryOutput from '../outputs/ImageStoryOutput';
+import VideoStoryOutput from '../outputs/VideoStoryOutput';
 
 const OUTPUT_MAP = {
   story:     StoryOutput,
@@ -24,6 +25,7 @@ const OUTPUT_MAP = {
   analogy:   AnalogyOutput,
   freewrite: WriteCheckOutput,
   imgstory:  ImageStoryOutput,
+  video:     VideoStoryOutput,
 };
 
 export default function StepOutput({ fmt, loading, error, parsed, content, onBack, onRetry }) {
