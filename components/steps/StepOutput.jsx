@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { FORMAT_META } from '@/lib/prompts';
 import StoryOutput from '../outputs/StoryOutput';
 import VisualOutput from '../outputs/VisualOutput';
@@ -53,16 +54,62 @@ function buildDownloadText(fmt, parsed) {
 export default function StepOutput({ fmt, loading, error, parsed, content, onBack, onRetry }) {
   const meta = FORMAT_META[fmt] || {};
   const OutputComponent = OUTPUT_MAP[fmt];
+  const [dlOpen, setDlOpen] = useState(false);
+  const [dlBusy, setDlBusy] = useState(false);
 
-  function handleDownload() {
-    const text = buildDownloadText(fmt, parsed);
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `learnify-${fmt}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function handleDownload(format) {
+    setDlOpen(false);
+    setDlBusy(true);
+    try {
+      if (format === 'txt') {
+        const text = buildDownloadText(fmt, parsed);
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `learnify-${fmt}.txt`; a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const el = document.getElementById('learnify-output-content');
+        if (!el) return;
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        if (format === 'png') {
+          const a = document.createElement('a');
+          a.download = `learnify-${fmt}.png`;
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+        } else if (format === 'pdf') {
+          const { jsPDF } = await import('jspdf');
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'a4' });
+          const pageW = pdf.internal.pageSize.getWidth();
+          const pageH = pdf.internal.pageSize.getHeight();
+          const imgW = pageW;
+          const imgH = (canvas.height * imgW) / canvas.width;
+          let y = 0;
+          const imgData = canvas.toDataURL('image/png');
+          if (imgH <= pageH) {
+            pdf.addImage(imgData, 'PNG', 0, 0, imgW, imgH);
+          } else {
+            // Multi-page: slice canvas into pages
+            let remaining = canvas.height;
+            let srcY = 0;
+            const sliceH = Math.floor(canvas.width * (pageH / imgW));
+            let first = true;
+            while (remaining > 0) {
+              const sh = Math.min(sliceH, remaining);
+              const slice = document.createElement('canvas');
+              slice.width = canvas.width; slice.height = sh;
+              slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sh, 0, 0, canvas.width, sh);
+              if (!first) pdf.addPage();
+              pdf.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, imgW, (sh * imgW) / canvas.width);
+              srcY += sh; remaining -= sh; first = false;
+            }
+          }
+          pdf.save(`learnify-${fmt}.pdf`);
+        }
+      }
+    } catch(e) { console.error('Download error', e); }
+    setDlBusy(false);
   }
 
   return (
@@ -78,7 +125,6 @@ export default function StepOutput({ fmt, loading, error, parsed, content, onBac
             <div className="dot" /><div className="dot" /><div className="dot" />
           </div>
         )}
-
         {!loading && error && (
           <div className="err-box">
             <p className="err-title">Could not transform content</p>
@@ -86,9 +132,10 @@ export default function StepOutput({ fmt, loading, error, parsed, content, onBac
             <button className="btn-retry" onClick={onRetry}>↻ Retry</button>
           </div>
         )}
-
         {!loading && !error && parsed && OutputComponent && (
-          <OutputComponent data={parsed} sourceContent={content} />
+          <div id="learnify-output-content">
+            <OutputComponent data={parsed} sourceContent={content} />
+          </div>
         )}
       </div>
 
@@ -100,9 +147,40 @@ export default function StepOutput({ fmt, loading, error, parsed, content, onBac
           ↻ Regenerate
         </button>
         {!loading && !error && parsed && (
-          <button className="btn-ghost" style={{ flex: 1 }} onClick={handleDownload}>
-            ⬇ Download
-          </button>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <button
+              className="btn-ghost"
+              style={{ width: '100%' }}
+              onClick={() => setDlOpen(o => !o)}
+              disabled={dlBusy}
+            >
+              {dlBusy ? '⏳ Saving…' : '⬇ Download ▾'}
+            </button>
+            {dlOpen && (
+              <div style={{
+                position: 'absolute', bottom: '110%', left: 0, right: 0,
+                background: 'var(--surface1, #1e1e2e)',
+                border: '1px solid var(--border, #333)',
+                borderRadius: 8, overflow: 'hidden', zIndex: 99,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              }}>
+                {[
+                  { f: 'png', label: '🖼 PNG image' },
+                  { f: 'pdf', label: '📄 PDF document' },
+                  { f: 'txt', label: '📝 Text file' },
+                ].map(({ f, label }) => (
+                  <button key={f} onClick={() => handleDownload(f)} style={{
+                    display: 'block', width: '100%', padding: '10px 14px',
+                    background: 'none', border: 'none', color: 'var(--text1, #eee)',
+                    textAlign: 'left', cursor: 'pointer', fontSize: 13,
+                  }}
+                  onMouseEnter={e => e.target.style.background = 'var(--surface2, #2a2a3e)'}
+                  onMouseLeave={e => e.target.style.background = 'none'}
+                  >{label}</button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
