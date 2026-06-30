@@ -1,42 +1,47 @@
 'use client';
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-function KlingPanel({ scenes, title }) {
+function VideoGenPanel({ scenes }) {
   const [status, setStatus] = useState('idle');
   const [clips, setClips] = useState([]);
-  const [current, setCurrent] = useState(0);
+  const [activeClip, setActiveClip] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [progress, setProgress] = useState('');
   const pollRef = useRef(null);
 
-  const buildPrompt = (scene) => {
-    const base = 'Educational documentary video. ' + scene.title + '. ' + (scene.narration || '');
-    return base.slice(0, 500);
-  };
+  const buildPrompt = (scene) =>
+    ('Cinematic educational documentary. ' + scene.title + '. ' + (scene.narration || '')).slice(0, 400);
 
   const generateAll = async () => {
     setStatus('generating');
     setErrorMsg('');
     setClips([]);
-    const sceneSlice = scenes.slice(0, 6);
-    setProgress('Submitting ' + sceneSlice.length + ' scenes to Kling AI...');
+    const sceneSlice = scenes.slice(0, 5);
     try {
-      const taskIds = [];
+      const tasks = [];
       for (let i = 0; i < sceneSlice.length; i++) {
         setProgress('Submitting scene ' + (i + 1) + ' of ' + sceneSlice.length + '...');
-        const res = await fetch('/api/kling', {
+        const res = await fetch('/api/videogen', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: buildPrompt(sceneSlice[i]), duration: 5, aspect_ratio: '16:9' }),
+          body: JSON.stringify({ prompt: buildPrompt(sceneSlice[i]) }),
         });
         const data = await res.json();
-        if (!res.ok || !data.task_id) throw new Error(data.error || 'Failed to submit scene ' + (i + 1));
-        taskIds.push({ task_id: data.task_id, scene: sceneSlice[i], video_url: null, done: false });
-        await new Promise(r => setTimeout(r, 1000));
+        if (!res.ok || !data.id) throw new Error(data.error || 'Failed scene ' + (i + 1));
+        if (data.status === 'succeeded' && data.output) {
+          tasks.push({ id: data.id, scene: sceneSlice[i], video_url: Array.isArray(data.output) ? data.output[0] : data.output, done: true });
+        } else {
+          tasks.push({ id: data.id, scene: sceneSlice[i], video_url: null, done: false });
+        }
+        await new Promise(r => setTimeout(r, 800));
       }
+      const allDone = tasks.every(t => t.done);
+      const ready = tasks.filter(t => t.video_url);
+      setClips([...ready]);
+      if (allDone) { setStatus('done'); return; }
       setStatus('polling');
-      setProgress('Rendering... Kling AI usually takes 30-90 seconds per clip.');
-      pollAll(taskIds);
+      setProgress('Generating... Seedance AI usually takes 30-60s per clip.');
+      pollAll(tasks);
     } catch (e) {
       setStatus('error');
       setErrorMsg(e.message);
@@ -46,13 +51,13 @@ function KlingPanel({ scenes, title }) {
   const pollAll = (tasks) => {
     const state = tasks.map(t => ({ ...t }));
     pollRef.current = setInterval(async () => {
-      let doneCount = 0;
+      let doneCount = state.filter(t => t.done).length;
       for (let i = 0; i < state.length; i++) {
-        if (state[i].done) { doneCount++; continue; }
+        if (state[i].done) continue;
         try {
-          const res = await fetch('/api/kling?task_id=' + state[i].task_id);
+          const res = await fetch('/api/videogen?id=' + state[i].id);
           const data = await res.json();
-          if (data.status === 'succeed' || data.status === 'completed') {
+          if (data.status === 'succeeded' && data.video_url) {
             state[i].video_url = data.video_url;
             state[i].done = true;
             doneCount++;
@@ -69,48 +74,48 @@ function KlingPanel({ scenes, title }) {
         clearInterval(pollRef.current);
         setStatus('done');
       }
-    }, 8000);
+    }, 6000);
   };
 
   useEffect(() => () => clearInterval(pollRef.current), []);
 
   return (
     <div style={{ marginTop: 28, borderTop: '1px solid var(--border, #2a2a3e)', paddingTop: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text1, #eee)' }}>Generate AI Video Clips</span>
         <span style={{ fontSize: 10, background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>PREMIUM</span>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text2, #aaa)', marginBottom: 14, lineHeight: 1.5 }}>
-        Turn each scene into a real AI-generated video clip using Kling AI. Up to 6 scenes, ~30-90s per clip.
+        Turn each scene into a real AI video using Seedance by ByteDance. Up to 5 clips, ~30-60s each.
       </p>
 
       {status === 'idle' && (
         <>
-          <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'var(--text2, #aaa)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text1, #eee)' }}>Setup required:</strong> Add your Kling API key to Vercel as <code style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: 3 }}>KLING_API_KEY</code>. Get a free key at{' '}
-            <a href="https://klingapi.com" target="_blank" rel="noreferrer" style={{ color: '#7c3aed' }}>klingapi.com</a> (includes $1 free credits).
+          <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 8, padding: '12px 14px', marginBottom: 14, fontSize: 12, color: 'var(--text2, #aaa)', lineHeight: 1.7 }}>
+            <strong style={{ color: 'var(--text1, #eee)', display: 'block', marginBottom: 4 }}>One-time setup (free):</strong>
+            1. Sign up at <a href="https://replicate.com" target="_blank" rel="noreferrer" style={{ color: '#7c3aed' }}>replicate.com</a> (free account, includes trial credits)<br />
+            2. Go to <a href="https://replicate.com/account/api-tokens" target="_blank" rel="noreferrer" style={{ color: '#7c3aed' }}>replicate.com/account/api-tokens</a> and copy your token<br />
+            3. Add it to Vercel as <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 3 }}>REPLICATE_API_TOKEN</code> and redeploy
           </div>
           <button onClick={generateAll} style={{
             background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: '#fff', border: 'none',
             borderRadius: 10, padding: '12px 24px', fontWeight: 700, fontSize: 14,
             cursor: 'pointer', width: '100%', boxShadow: '0 4px 16px rgba(124,58,237,0.4)',
           }}>
-            Generate {Math.min(scenes.length, 6)} Video Clips with Kling AI
+            Generate {Math.min(scenes.length, 5)} Video Clips
           </button>
         </>
       )}
 
       {(status === 'generating' || status === 'polling') && (
         <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 10 }}>
             {[0,1,2].map(i => (
-              <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', animation: 'pulse 1.2s ease-in-out ' + (i * 0.2) + 's infinite alternate', opacity: 0.7 }} />
+              <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', opacity: 0.7 }} />
             ))}
           </div>
-          <p style={{ fontSize: 13, color: 'var(--text2, #aaa)', lineHeight: 1.5 }}>{progress}</p>
-          {clips.length > 0 && (
-            <p style={{ fontSize: 11, color: '#7c3aed', marginTop: 6 }}>{clips.length} clip(s) ready - scroll down to preview</p>
-          )}
+          <p style={{ fontSize: 13, color: 'var(--text2, #aaa)' }}>{progress}</p>
+          {clips.length > 0 && <p style={{ fontSize: 11, color: '#7c3aed', marginTop: 6 }}>{clips.length} clip(s) ready below</p>}
         </div>
       )}
 
@@ -124,22 +129,21 @@ function KlingPanel({ scenes, title }) {
 
       {clips.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <p style={{ fontSize: 11, color: 'var(--text2, #888)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Generated clips</p>
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 10 }}>
             {clips.map((c, i) => (
-              <button key={i} onClick={() => setCurrent(i)} style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 6, border: '2px solid ' + (i === current ? '#7c3aed' : 'transparent'), background: i === current ? 'rgba(124,58,237,0.2)' : 'var(--surface1, #1e1e2e)', color: 'var(--text1, #eee)', cursor: 'pointer', fontSize: 11 }}>
+              <button key={i} onClick={() => setActiveClip(i)} style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 6, border: '2px solid ' + (i === activeClip ? '#7c3aed' : 'transparent'), background: i === activeClip ? 'rgba(124,58,237,0.2)' : 'var(--surface1, #1e1e2e)', color: 'var(--text1, #eee)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                 Scene {i + 1}
               </button>
             ))}
           </div>
-          {clips[current] && (
-            <div>
-              <video key={clips[current].video_url} src={clips[current].video_url} controls autoPlay style={{ width: '100%', borderRadius: 10, marginBottom: 8, background: '#000' }} />
-              <p style={{ fontSize: 11, color: 'var(--text2, #888)', marginBottom: 8 }}>{clips[current].scene?.title}</p>
-              <a href={clips[current].video_url} download={'scene-' + (current + 1) + '.mp4'} style={{ display: 'block', textAlign: 'center', padding: '8px', background: 'var(--accent, #7c3aed)', color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>
+          {clips[activeClip] && (
+            <>
+              <video key={clips[activeClip].video_url} src={clips[activeClip].video_url} controls autoPlay style={{ width: '100%', borderRadius: 10, marginBottom: 8, background: '#000' }} />
+              <p style={{ fontSize: 11, color: 'var(--text2, #888)', marginBottom: 8 }}>{clips[activeClip].scene?.title}</p>
+              <a href={clips[activeClip].video_url} download={'scene-' + (activeClip + 1) + '.mp4'} style={{ display: 'block', textAlign: 'center', padding: '8px', background: '#7c3aed', color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>
                 Download clip
               </a>
-            </div>
+            </>
           )}
           {status === 'done' && (
             <button onClick={() => { setStatus('idle'); setClips([]); }} style={{ marginTop: 8, width: '100%', padding: '8px', borderRadius: 8, background: 'none', border: '1px solid var(--border, #333)', color: 'var(--text2, #aaa)', cursor: 'pointer', fontSize: 12 }}>
@@ -246,7 +250,7 @@ export default function VideoStoryOutput({ data }) {
         ))}
       </div>
 
-      <KlingPanel scenes={scenes} title={title} />
+      <VideoGenPanel scenes={scenes} />
     </div>
   );
 }
