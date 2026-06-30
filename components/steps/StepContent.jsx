@@ -1,48 +1,63 @@
 'use client';
+import { useRef, useState } from 'react';
 import { FORMAT_META } from '@/lib/prompts';
 
 const FORMATS = Object.entries(FORMAT_META).map(([id, meta]) => ({ id, ...meta }));
 
-export default function StepContent({ content, fmt, onContentChange, onFmtChange, onBack, onNext }) {
-  return (
-    <div>
-      <button className="btn-back" onClick={onBack}>← Back</button>
-      <div className="step-ind">Step 2 of 3 — your content and format</div>
-      <h2>Paste what you want to learn</h2>
-      <p className="sub">Your content stays exactly as-is. We only change how it&apos;s presented — never what it says.</p>
+function extractFrames(file, numFrames = 10) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    const url = URL.createObjectURL(file);
+    video.src = url;
 
-      <div className="note">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
-          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>Core content is never altered — we only repackage it to keep you engaged and focused.</span>
-      </div>
+    video.addEventListener('loadedmetadata', () => {
+      const duration = video.duration;
+      const interval = duration / (numFrames + 1);
+      const frames = [];
+      let captured = 0;
 
-      <textarea
-        value={content}
-        onChange={(e) => onContentChange(e.target.value)}
-        placeholder="Paste a chapter, lecture notes, bullet points, a report — anything you want to transform..."
-      />
-      <div className="char-ct">{content.length} characters</div>
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
 
-      <p className="fmt-section-title">Choose your output format</p>
-      <div className="fmt-grid">
-        {FORMATS.map((f) => (
-          <button
-            key={f.id}
-            className={`fb${fmt === f.id ? ' sel' : ''}`}
-            onClick={() => onFmtChange(f.id)}
-          >
-            <div className="f-icon">{f.icon}</div>
-            <p className="f-label">{f.label}</p>
-            <p className="f-sub">{f.sub}</p>
-          </button>
-        ))}
-      </div>
+      const captureAt = (time) =>
+        new Promise((res) => {
+          video.currentTime = time;
+          video.addEventListener(
+            'seeked',
+            () => {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+              frames.push(data);
+              captured++;
+              res();
+            },
+            { once: true }
+          );
+        });
 
-      <button className="btn-primary" onClick={onNext} disabled={content.trim().length < 20}>
-        ✨ Transform it
-      </button>
-    </div>
-  );
+      const times = Array.from({ length: numFrames }, (_, i) => interval * (i + 1));
+
+      (async () => {
+        for (const t of times) await captureAt(t);
+        URL.revokeObjectURL(url);
+        resolve(frames);
+      })();
+    });
+
+    video.addEventListener('error', () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not load video'));
+    });
+  });
 }
+
+export default function StepContent({ content, fmt, onContentChange, onFmtChange, onBack, onNext }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
+  const imgRef = useRef(null);
+  const vidRef = useRef(null);
+
