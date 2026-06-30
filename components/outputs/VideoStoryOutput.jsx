@@ -1,56 +1,153 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
-const COLORS = [
-  ['#1a1a2e', '#16213e', '#e94560'],
-  ['#0f3460', '#533483', '#e94560'],
-  ['#1b1b2f', '#2c2c54', '#f5a623'],
-  ['#162447', '#1f4068', '#1b6ca8'],
-  ['#1a1a1a', '#2d2d2d', '#00b4d8'],
-  ['#0d0d0d', '#1a1a2e', '#7209b7'],
-  ['#0a0a23', '#1a1a3e', '#06d6a0'],
-  ['#1c1c1e', '#2c2c2e', '#ff6b6b'],
+const AVATARS = [
+  { id: 'Anna_public_3_20240108',    name: 'Anna',    emoji: '\u{1F469}\u200D\u{1F4BC}', style: 'Professional' },
+  { id: 'Susan_public_2_20240328',   name: 'Susan',   emoji: '\u{1F469}\u200D\u{1F3EB}', style: 'Educator' },
+  { id: 'William_public_3_20240108', name: 'William', emoji: '\u{1F468}\u200D\u{1F4BC}', style: 'Professional' },
+  { id: 'Daisy_public_2_20240408',   name: 'Daisy',   emoji: '\u{1F469}\u200D\u{1F3A4}', style: 'Energetic' },
 ];
 
-export default function VideoStoryOutput({ data }) {
-  const { scenes = [], title = '' } = data;
-  const [current, setCurrent] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [images, setImages] = useState({});
-  const [imgLoading, setImgLoading] = useState({});
-  const [progress, setProgress] = useState(0);
-  const [animKey, setAnimKey] = useState(0);
-  const [loadingAudio, setLoadingAudio] = useState(false);
-  const audioRef = useRef(null);
-  const progRef = useRef(null);
-  const blobUrls = useRef({});
-  const fetchingImg = useRef({});
+function HeyGenPanel({ scenes, title }) {
+  const [avatarId, setAvatarId] = useState(AVATARS[0].id);
+  const [status, setStatus] = useState('idle');
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [pollMsg, setPollMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const pollRef = useRef(null);
 
-  const fetchImage = useCallback(async (idx) => {
-    if (images[idx] || fetchingImg.current[idx] || !scenes[idx]) return;
-    fetchingImg.current[idx] = true;
-    setImgLoading(l => ({ ...l, [idx]: true }));
+  const startGeneration = async () => {
+    setStatus('generating');
+    setErrorMsg('');
+    setVideoUrl(null);
     try {
-      const scene = scenes[idx];
-      const prompt = `${scene.title}. ${scene.narration.slice(0, 120)}`;
-      const res = await fetch('/api/scene-image', {
+      const res = await fetch('/api/heygen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ scenes, avatarId, title }),
       });
-      const d = await res.json();
-      if (d.image) setImages(im => ({ ...im, [idx]: d.image }));
-    } catch (e) {}
-    setImgLoading(l => ({ ...l, [idx]: false }));
-    fetchingImg.current[idx] = false;
-  }, [images, scenes]);
+      const data = await res.json();
+      if (!res.ok || !data.video_id) throw new Error(data.error || 'Failed to start generation');
+      setStatus('polling');
+      setPollMsg('HeyGen is rendering your video\u2026 this usually takes 2\u20135 minutes.');
+      pollStatus(data.video_id);
+    } catch (e) {
+      setStatus('error');
+      setErrorMsg(e.message);
+    }
+  };
 
-  useEffect(() => {
-    fetchImage(current);
-    if (current + 1 < scenes.length) fetchImage(current + 1);
-  }, [current, scenes.length]);
+  const pollStatus = (video_id) => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/heygen?video_id=' + video_id);
+        const data = await res.json();
+        if (data.status === 'completed' && data.video_url) {
+          clearInterval(pollRef.current);
+          setVideoUrl(data.video_url);
+          setStatus('done');
+        } else if (data.status === 'failed') {
+          clearInterval(pollRef.current);
+          setStatus('error');
+          setErrorMsg('HeyGen rendering failed. Please try again.');
+        } else {
+          const pct = data.progress ? ' (' + Math.round(data.progress * 100) + '%)' : '';
+          setPollMsg('Rendering in progress' + pct + '\u2026 checking again in 10 seconds.');
+        }
+      } catch (e) {}
+    }, 10000);
+  };
 
-  // FIX: null out handlers BEFORE pausing/clearing src to prevent onerror firing
+  useEffect(() => () => clearInterval(pollRef.current), []);
+
+  return (
+    <div style={{ marginTop: 28, borderTop: '1px solid var(--border, #2a2a3e)', paddingTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 18 }}>\uD83C\uDFA6</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text1, #eee)' }}>Generate Real AI Video</span>
+        <span style={{ fontSize: 10, background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>PREMIUM</span>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text2, #aaa)', marginBottom: 14, lineHeight: 1.5 }}>
+        Turn this script into a professional video with a consistent AI presenter \u2014 same character across all scenes.
+      </p>
+
+      {status === 'idle' && (
+        <>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            {AVATARS.map(av => (
+              <button key={av.id} onClick={() => setAvatarId(av.id)} style={{
+                padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                border: '2px solid ' + (avatarId === av.id ? 'var(--accent, #7c3aed)' : 'var(--border, #333)'),
+                background: avatarId === av.id ? 'rgba(124,58,237,0.15)' : 'var(--surface1, #1e1e2e)',
+                color: 'var(--text1, #eee)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              }}>
+                <span style={{ fontSize: 22 }}>{av.emoji}</span>
+                <span style={{ fontWeight: 600 }}>{av.name}</span>
+                <span style={{ color: 'var(--text2, #aaa)', fontSize: 10 }}>{av.style}</span>
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text2, #888)', marginBottom: 12 }}>
+            {Math.min(scenes.length, 10)} scenes \u00b7 renders in 2\u20135 min
+          </p>
+          <button onClick={startGeneration} style={{
+            background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: '#fff', border: 'none',
+            borderRadius: 10, padding: '12px 24px', fontWeight: 700, fontSize: 14,
+            cursor: 'pointer', width: '100%', boxShadow: '0 4px 16px rgba(124,58,237,0.4)',
+          }}>
+            Generate with {AVATARS.find(a => a.id === avatarId)?.name || 'Avatar'}
+          </button>
+        </>
+      )}
+
+      {status === 'generating' && (
+        <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text2, #aaa)' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>\u23F3</div>
+          <p style={{ fontSize: 13 }}>Submitting to HeyGen\u2026</p>
+        </div>
+      )}
+
+      {status === 'polling' && (
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>\uD83C\uDF9E\uFE0F</div>
+          <p style={{ fontSize: 13, color: 'var(--text2, #aaa)', lineHeight: 1.5 }}>{pollMsg}</p>
+          <p style={{ fontSize: 11, color: 'var(--text2, #666)', marginTop: 8 }}>You can leave this tab open \u2014 we check every 10 seconds.</p>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div style={{ padding: 14, background: 'rgba(233,69,96,0.1)', border: '1px solid #e94560', borderRadius: 8 }}>
+          <p style={{ color: '#e94560', fontWeight: 600, marginBottom: 6 }}>Generation failed</p>
+          <p style={{ color: 'var(--text2, #aaa)', fontSize: 12 }}>{errorMsg}</p>
+          <button onClick={() => setStatus('idle')} style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, cursor: 'pointer', background: 'none', border: '1px solid #e94560', color: '#e94560', fontSize: 12 }}>\u21A9 Try again</button>
+        </div>
+      )}
+
+      {status === 'done' && videoUrl && (
+        <div>
+          <video src={videoUrl} controls style={{ width: '100%', borderRadius: 10, marginBottom: 12 }} />
+          <a href={videoUrl} download="learnify-video.mp4" style={{ display: 'block', textAlign: 'center', padding: '10px', background: 'var(--accent, #7c3aed)', color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>
+            \u2B07 Download MP4
+          </a>
+          <button onClick={() => { setStatus('idle'); setVideoUrl(null); }} style={{ marginTop: 8, width: '100%', padding: '8px', borderRadius: 8, background: 'none', border: '1px solid var(--border, #333)', color: 'var(--text2, #aaa)', cursor: 'pointer', fontSize: 12 }}>
+            \u21A9 Generate with a different avatar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function VideoStoryOutput({ data }) {
+  const { title = '', scenes = [] } = data;
+  const [current, setCurrent] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const audioRef = useRef(null);
+  const progRef = useRef(null);
+  const scene = scenes[current] || {};
+
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.onended = null;
@@ -64,182 +161,77 @@ export default function VideoStoryOutput({ data }) {
     setLoadingAudio(false);
   }, []);
 
-  const goToScene = useCallback((idx, autoPlay = false) => {
-    stopAudio();
-    setCurrent(idx);
-    setAnimKey(k => k + 1);
-    setProgress(0);
-    if (autoPlay) setPlaying(true);
+  const goTo = useCallback((idx) => {
+    stopAudio(); setPlaying(false); setProgress(0); setCurrent(idx);
   }, [stopAudio]);
 
   const playScene = useCallback(async (idx) => {
-    if (!scenes[idx]) { setPlaying(false); return; }
-    const narration = scenes[idx].narration;
+    stopAudio(); setProgress(0);
+    const s = scenes[idx];
+    if (!s) return;
     setLoadingAudio(true);
     try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: narration }),
-      });
+      const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: s.narration }) });
       if (!res.ok) throw new Error('TTS failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      if (blobUrls.current[idx]) URL.revokeObjectURL(blobUrls.current[idx]);
-      blobUrls.current[idx] = url;
-
       const audio = new Audio(url);
       audioRef.current = audio;
-      setLoadingAudio(false);
-
-      audio.ontimeupdate = () => {
-        if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100);
-      };
       audio.onended = () => {
-        setProgress(100);
-        setTimeout(() => {
-          if (idx + 1 < scenes.length) goToScene(idx + 1, true);
-          else setPlaying(false);
-        }, 600);
+        URL.revokeObjectURL(url); clearInterval(progRef.current); setProgress(0); setPlaying(false);
+        if (idx + 1 < scenes.length) { setCurrent(idx + 1); setTimeout(() => playScene(idx + 1), 300); }
       };
-      audio.onerror = () => {
-        if (idx + 1 < scenes.length) goToScene(idx + 1, true);
-        else setPlaying(false);
-      };
-      await audio.play();
-    } catch (e) {
-      setLoadingAudio(false);
-      const dur = 6000;
-      const start = Date.now();
-      progRef.current = setInterval(() => {
-        const p = Math.min(100, ((Date.now() - start) / dur) * 100);
-        setProgress(p);
-        if (p >= 100) {
-          clearInterval(progRef.current);
-          if (idx + 1 < scenes.length) goToScene(idx + 1, true);
-          else setPlaying(false);
-        }
-      }, 50);
-    }
-  }, [scenes, goToScene]);
+      audio.onerror = () => { URL.revokeObjectURL(url); stopAudio(); setPlaying(false); };
+      audio.ontimeupdate = () => { if (audio.duration) setProgress(audio.currentTime / audio.duration); };
+      setLoadingAudio(false); setPlaying(true); audio.play();
+    } catch (e) { setLoadingAudio(false); setPlaying(false); }
+  }, [scenes, stopAudio]);
 
-  useEffect(() => {
-    if (playing) playScene(current);
-    else stopAudio();
-    return () => stopAudio();
-  }, [playing, current]);
+  const handlePlayPause = () => {
+    if (loadingAudio) return;
+    if (playing) { audioRef.current?.pause(); clearInterval(progRef.current); setPlaying(false); }
+    else { audioRef.current?.paused ? (audioRef.current.play(), setPlaying(true)) : playScene(current); }
+  };
 
-  useEffect(() => () => {
-    stopAudio();
-    Object.values(blobUrls.current).forEach(u => URL.revokeObjectURL(u));
-  }, []);
-
-  if (!scenes.length) return <p style={{ color: 'var(--text2)' }}>No scenes generated.</p>;
-
-  const scene = scenes[current];
-  const [bg1, bg2, accent] = COLORS[current % COLORS.length];
-  const imgSrc = images[current] ? `data:image/jpeg;base64,${images[current]}` : null;
+  if (!scenes.length) return <p style={{ color: 'var(--text2)' }}>No video script generated.</p>;
 
   return (
-    <div style={{ fontFamily: 'inherit' }}>
-      {title && (
-        <p style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12 }}>
-          {title}
-        </p>
-      )}
-      <div key={animKey} style={{
-        position: 'relative', borderRadius: 12, overflow: 'hidden',
-        minHeight: 340, display: 'flex', flexDirection: 'column',
-        background: `linear-gradient(135deg, ${bg1} 0%, ${bg2} 100%)`,
-        boxShadow: `0 0 0 1px ${accent}22, 0 8px 32px #0008`,
-        animation: 'fadeInScene 0.5s ease',
-      }}>
-        {imgSrc && (
-          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-            <img src={imgSrc} alt="" style={{
-              width: '100%', height: '100%', objectFit: 'cover',
-              animation: 'kenBurns 14s ease-in-out forwards', opacity: 0.5,
-            }} />
-            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${bg1}bb 0%, ${bg2}88 100%)` }} />
-          </div>
-        )}
-        {imgLoading[current] && !imgSrc && (
-          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, background: '#00000077', borderRadius: 6, padding: '4px 10px' }}>
-            <span style={{ fontSize: 11, color: '#fff8' }}>✨ Generating scene...</span>
-          </div>
-        )}
-        {loadingAudio && (
-          <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, background: accent + '33', border: `1px solid ${accent}66`, borderRadius: 6, padding: '4px 10px' }}>
-            <span style={{ fontSize: 11, color: accent }}>🎙 Loading voice...</span>
-          </div>
-        )}
-        <div style={{ position: 'relative', zIndex: 1, padding: '32px 28px 28px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-            <span style={{ fontSize: 11, color: accent, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', opacity: 0.9 }}>
-              Scene {current + 1} / {scenes.length}
-            </span>
-            <span style={{ fontSize: 28 }}>{scene.emoji || '🎬'}</span>
-          </div>
-          <h3 style={{ color: '#fff', fontSize: 22, fontWeight: 700, lineHeight: 1.3, marginBottom: 16, textShadow: '0 2px 12px #000a', animation: 'slideUp 0.5s ease 0.1s both' }}>
-            {scene.title}
-          </h3>
-          {scene.keyfact && (
-            <div style={{ background: accent + '22', border: `1px solid ${accent}66`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, animation: 'slideUp 0.5s ease 0.25s both' }}>
-              <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: 0 }}>{scene.keyfact}</p>
-            </div>
-          )}
-          <div style={{ background: '#00000066', borderRadius: 8, padding: '12px 16px', animation: 'slideUp 0.5s ease 0.35s both', flex: 1 }}>
-            <p style={{ color: '#ffffffcc', fontSize: 13, lineHeight: 1.7, margin: 0 }}>{scene.narration}</p>
-          </div>
+    <div>
+      <p style={{ fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--text2, #888)', marginBottom: 12 }}>{title}</p>
+      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', borderRadius: 16, overflow: 'hidden', position: 'relative', minHeight: 280, padding: '28px 24px 24px' }}>
+        <div style={{ position: 'absolute', top: 16, left: 20, fontSize: 10, letterSpacing: 2, color: 'var(--accent, #7c3aed)', fontWeight: 700, textTransform: 'uppercase' }}>
+          Scene {current + 1} / {scenes.length}
         </div>
+        <div style={{ position: 'absolute', top: 12, right: 16, fontSize: 28, opacity: 0.8 }}>{scene.emoji || '\uD83C\uDFA6'}</div>
+        <h3 style={{ color: '#fff', fontSize: 20, fontWeight: 800, marginTop: 32, marginBottom: 12, lineHeight: 1.3 }}>{scene.title}</h3>
+        {scene.keyfact && (
+          <div style={{ background: 'rgba(124,58,237,0.25)', border: '1px solid rgba(124,58,237,0.5)', borderRadius: 6, padding: '6px 12px', marginBottom: 14, fontSize: 12, color: '#c4b5fd', fontWeight: 600 }}>{scene.keyfact}</div>
+        )}
+        <p style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13.5, lineHeight: 1.75 }}>{scene.narration}</p>
         {playing && (
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: '#ffffff22' }}>
-            <div style={{ height: '100%', background: accent, width: progress + '%', transition: 'width 0.15s linear' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.1)' }}>
+            <div style={{ width: (progress * 100) + '%', height: '100%', background: 'var(--accent, #7c3aed)', transition: 'width 0.3s' }} />
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-        <button onClick={() => { if (current > 0) goToScene(current - 1, playing); }} disabled={current === 0} style={ctrlBtn(current === 0)}>◀</button>
-        <button
-          onClick={() => setPlaying(p => !p)}
-          disabled={loadingAudio}
-          style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: loadingAudio ? 'wait' : 'pointer', opacity: loadingAudio ? 0.7 : 1 }}
-        >
-          {loadingAudio ? '🎙 Loading...' : playing ? '⏸ Pause' : current === 0 ? '▶ Play Documentary' : '▶ Resume'}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
+        <button onClick={() => goTo(Math.max(0, current - 1))} disabled={current === 0} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === 0 ? 'not-allowed' : 'pointer', opacity: current === 0 ? 0.4 : 1, fontSize: 16 }}>\u25C0</button>
+        <button onClick={handlePlayPause} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'var(--accent, #7c3aed)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: loadingAudio ? 'wait' : 'pointer' }}>
+          {loadingAudio ? '\u23F3 Loading\u2026' : playing ? '\u23F8 Pause' : '\u25B6 Play Documentary'}
         </button>
-        <button onClick={() => { if (current + 1 < scenes.length) goToScene(current + 1, playing); }} disabled={current === scenes.length - 1} style={ctrlBtn(current === scenes.length - 1)}>▶</button>
+        <button onClick={() => goTo(Math.min(scenes.length - 1, current + 1))} disabled={current === scenes.length - 1} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #333)', background: 'none', color: 'var(--text1, #eee)', cursor: current === scenes.length - 1 ? 'not-allowed' : 'pointer', opacity: current === scenes.length - 1 ? 0.4 : 1, fontSize: 16 }}>\u25B6</button>
       </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto', paddingBottom: 4 }}>
-        {scenes.map((s, i) => {
-          const [c1, c2, ac] = COLORS[i % COLORS.length];
-          return (
-            <button key={i} onClick={() => goToScene(i, playing)} style={{
-              flex: '0 0 auto', width: 72, height: 48, borderRadius: 6,
-              background: images[i] ? `url(data:image/jpeg;base64,${images[i]}) center/cover` : `linear-gradient(135deg, ${c1}, ${c2})`,
-              border: i === current ? `2px solid ${ac}` : '2px solid transparent',
-              cursor: 'pointer', fontSize: 16, transition: 'all 0.2s',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              {images[i] && <div style={{ position: 'absolute', inset: 0, background: '#0005' }} />}
-              <span style={{ position: 'relative', zIndex: 1 }}>{s.emoji || '🎬'}</span>
-            </button>
-          );
-        })}
+
+      <div style={{ display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto', paddingBottom: 4 }}>
+        {scenes.map((s, i) => (
+          <button key={i} onClick={() => goTo(i)} style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 8, border: '2px solid ' + (i === current ? 'var(--accent, #7c3aed)' : 'transparent'), background: i === current ? 'rgba(124,58,237,0.2)' : 'var(--surface1, #1e1e2e)', cursor: 'pointer', fontSize: 18 }}>
+            {s.emoji || '\uD83C\uDFA6'}
+          </button>
+        ))}
       </div>
-      <style>{`
-        @keyframes fadeInScene { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes kenBurns { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.08) translate(-2%, -1%); } }
-      `}</style>
+
+      <HeyGenPanel scenes={scenes} title={title} />
     </div>
   );
-}
-
-function ctrlBtn(disabled) {
-  return {
-    padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)',
-    background: 'var(--surface2)', color: disabled ? 'var(--text3)' : 'var(--text1)',
-    fontSize: 13, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
-  };
 }
