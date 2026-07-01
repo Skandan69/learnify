@@ -1,22 +1,35 @@
 import { NextResponse } from 'next/server';
 export const maxDuration = 60;
-// v5 - gpt-image-1 correct usage: no response_format, returns b64_json as data URL
+// v6 - Replicate SDXL-Lightning (2-5s per image, fast)
 export async function POST(req) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return NextResponse.json({ error: 'OPENAI_API_KEY not set' }, { status: 500 });
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) return NextResponse.json({ error: 'REPLICATE_API_TOKEN not set' }, { status: 500 });
   const { prompt } = await req.json();
-  const full = 'Cinematic historical documentary still. Dramatic lighting, epic atmosphere. ' + (prompt || '') + ' National Geographic style photography. No text or watermarks.';
+  const full = 'Cinematic historical documentary photograph, dramatic golden lighting, ancient setting. ' + (prompt || '') + ' Epic atmosphere, detailed, photorealistic. No text.';
   try {
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
+    const res = await fetch('https://api.replicate.com/v1/models/bytedance/sdxl-lightning-4step/predictions', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-image-1', prompt: full.slice(0, 1000), n: 1, size: '1024x1024', quality: 'low' }),
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        'Prefer': 'wait'
+      },
+      body: JSON.stringify({
+        input: {
+          prompt: full.slice(0, 800),
+          width: 1024,
+          height: 576,
+          num_inference_steps: 4,
+          guidance_scale: 0,
+          negative_prompt: 'text, watermark, logo, blurry, modern, cartoon, anime'
+        }
+      })
     });
     const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.error?.message || 'OpenAI error' }, { status: res.status });
-    const b64 = data.data[0].b64_json;
-    if (!b64) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
-    return NextResponse.json({ url: 'data:image/png;base64,' + b64 });
+    if (data.error) return NextResponse.json({ error: data.error }, { status: 500 });
+    const url = Array.isArray(data.output) ? data.output[0] : data.output;
+    if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
+    return NextResponse.json({ url });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
